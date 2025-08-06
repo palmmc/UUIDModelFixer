@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minecraft Model UUID Fixer</title>
+    <!-- tailwind import -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jszip import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .file-input-label {
+        transition: all 0.2s ease-in-out;
+      }
+      .file-input-label:hover {
+        background-color: #4f46e5;
+      }
+      #file-list li {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4"
+  >
+    <div
+      class="w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6"
+    >
+      <div class="text-center">
+        <h1
+          class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white"
+        >
+          Model UUID Fixer
+        </h1>
+        <p class="mt-2 text-gray-600 dark:text-gray-400">
+          Upload the model(s) you would like to modify.
+        </p>
+      </div>
+      <div class="space-y-6">
+        <div>
+          <label
+            for="file-upload"
+            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >Select Files</label
+          >
+          <div
+            class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md"
+          >
+            <div class="space-y-1 text-center">
+              <svg
+                class="mx-auto h-12 w-12 text-gray-400"
+                stroke="currentColor"
+                fill="none"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+              >
+                <path
+                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <div class="flex text-sm text-gray-600 dark:text-gray-400">
+                <label
+                  for="file-upload"
+                  class="file-input-label relative cursor-pointer bg-indigo-600 rounded-md font-medium text-white px-3 py-1"
+                >
+                  <span>Upload files</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    class="sr-only"
+                    multiple
+                    accept=".ajblueprint,.ajmodel,.bbmodel"
+                  />
+                </label>
+                <p class="pl-1">or drag and drop</p>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-500">
+                .ajblueprint, .ajmodel, .bbmodel
+              </p>
+            </div>
+          </div>
+        </div>
+        <div id="file-list-container" class="hidden">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+            Selected Files:
+          </h3>
+          <ul
+            id="file-list"
+            class="mt-2 list-disc list-inside text-gray-600 dark:text-gray-400 space-y-1"
+          ></ul>
+        </div>
+        <div>
+          <label
+            for="target-extension"
+            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >Optional: Set file extension</label
+          >
+          <input
+            type="text"
+            name="target-extension"
+            id="target-extension"
+            class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="e.g., bbmodel (without the dot)"
+          />
+        </div>
+        <div>
+          <button
+            id="process-button"
+            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            Process & Download Models
+          </button>
+        </div>
+      </div>
+      <div
+        id="statustext"
+        class="text-center text-sm text-gray-500 dark:text-gray-400 min-h-[20px]"
+      ></div>
+    </div>
+
+    <script>
+      const fileInput = document.getElementById("file-upload");
+      const fileListContainer = document.getElementById("file-list-container");
+      const fileList = document.getElementById("file-list");
+      const extensionInput = document.getElementById("target-extension");
+      const fixButton = document.getElementById("process-button");
+      const statusText = document.getElementById("statustext");
+      fileInput.addEventListener("change", (event) => {
+        updateFileList(event.target.files);
+      });
+      const filedrop = document.querySelector(".border-dashed");
+      filedrop.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        filedrop.classList.add(
+          "border-indigo-500",
+          "bg-gray-50",
+          "dark:bg-gray-700"
+        );
+      });
+      filedrop.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        filedrop.classList.remove(
+          "border-indigo-500",
+          "bg-gray-50",
+          "dark:bg-gray-700"
+        );
+      });
+      filedrop.addEventListener("drop", (e) => {
+        e.preventDefault();
+        filedrop.classList.remove(
+          "border-indigo-500",
+          "bg-gray-50",
+          "dark:bg-gray-700"
+        );
+        const files = e.dataTransfer.files;
+        fileInput.files = files;
+        updateFileList(files);
+      });
+
+      fixButton.addEventListener("click", handleFileProcessing);
+      function updateFileList(files) {
+        fileList.innerHTML = "";
+        if (files.length > 0) {
+          fileListContainer.classList.remove("hidden");
+          Array.from(files).forEach((file) => {
+            const listItem = document.createElement("li");
+            listItem.textContent = `${file.name} (${(file.size / 1024).toFixed(
+              2
+            )} KB)`;
+            fileList.appendChild(listItem);
+          });
+        } else {
+          fileListContainer.classList.add("hidden");
+        }
+      }
+      function generateUUID() {
+        return crypto.randomUUID();
+      }
+      function replaceUUIDs(obj) {
+        if (obj === null || typeof obj !== "object") {
+          return;
+        }
+        if (Array.isArray(obj)) {
+          obj.forEach((item) => replaceUUIDs(item));
+        } else {
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              if (key === "uuid") {
+                obj[key] = generateUUID();
+              } else {
+                replaceUUIDs(obj[key]);
+              }
+            }
+          }
+        }
+      }
+
+      async function handleFileProcessing() {
+        const files = fileInput.files;
+        if (files.length === 0) {
+          updateStatus("Please select at least one file.", "error");
+          return;
+        }
+        fixButton.disabled = true;
+        updateStatus("Processing files...", "info");
+        const zip = new JSZip();
+        const promises = [];
+        for (const file of files) {
+          const promise = new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const content = event.target.result;
+                const json = JSON.parse(content);
+                replaceUUIDs(json);
+                const newJsonString = JSON.stringify(json, null, 2);
+                const originalName = file.name
+                  .split(".")
+                  .slice(0, -1)
+                  .join(".");
+                const originalExtension = file.name.split(".").pop();
+                const targetExtension =
+                  extensionInput.value.trim().replace(".", "") ||
+                  originalExtension;
+                const newFileName = `${originalName}.${targetExtension}`;
+                zip.file(newFileName, newJsonString);
+                resolve();
+              } catch (error) {
+                console.error(`Error processing file ${file.name}:`, error);
+                reject(
+                  `Failed to parse ${file.name}: Potentially invalid json.`
+                );
+              }
+            };
+            reader.onerror = () => {
+              reject(`Could not read file ${file.name}.`);
+            };
+            reader.readAsText(file);
+          });
+          promises.push(promise);
+        }
+        try {
+          await Promise.all(promises);
+          if (Object.keys(zip.files).length === 0) {
+            throw new Error("No files were successfully processed.");
+          }
+          updateStatus("Zipping files...", "info");
+          const content = await zip.generateAsync({ type: "blob" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(content);
+          link.download = "fixed-files.zip";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(link.href);
+
+          updateStatus("Download complete!", "success");
+        } catch (error) {
+          updateStatus(error.toString(), "error");
+        } finally {
+          fixButton.disabled = false;
+        }
+      }
+      function updateStatus(message, type) {
+        statusText.textContent = message;
+        statusText.classList.remove(
+          "text-blue-500",
+          "text-green-500",
+          "text-red-500"
+        );
+        switch (type) {
+          case "info":
+            statusText.classList.add("text-blue-500");
+            break;
+          case "success":
+            statusText.classList.add("text-green-500");
+            break;
+          case "error":
+            statusText.classList.add("text-red-500");
+            break;
+        }
+      }
+    </script>
+  </body>
+</html>
