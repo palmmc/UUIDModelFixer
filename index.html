@@ -199,20 +199,50 @@
       function generateUUID() {
         return crypto.randomUUID();
       }
-      function replaceUUIDs(obj) {
+
+      function mapAndReplaceUUIDs(obj, uuidMap) {
         if (obj === null || typeof obj !== "object") {
           return;
         }
+
         if (Array.isArray(obj)) {
-          obj.forEach((item) => replaceUUIDs(item));
+          obj.forEach((item) => mapAndReplaceUUIDs(item, uuidMap));
         } else {
           for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-              if (key === "uuid") {
-                obj[key] = generateUUID();
-              } else {
-                replaceUUIDs(obj[key]);
+              if (key === "uuid" && typeof obj[key] === "string") {
+                const oldUUID = obj[key];
+                if (!uuidMap[oldUUID]) {
+                  const newUUID = generateUUID();
+                  uuidMap[oldUUID] = newUUID;
+                  obj[key] = newUUID;
+                } else {
+                  obj[key] = uuidMap[oldUUID];
+                }
               }
+              mapAndReplaceUUIDs(obj[key], uuidMap);
+            }
+          }
+        }
+      }
+
+      function updateChildrenReferences(obj, uuidMap) {
+        if (obj === null || typeof obj !== "object") {
+          return;
+        }
+
+        if (Array.isArray(obj)) {
+          obj.forEach((item) => updateChildrenReferences(item, uuidMap));
+        } else {
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              // Update children uuids to correct new uuids.
+              if (key === "children" && Array.isArray(obj[key])) {
+                obj[key] = obj[key].map(
+                  (childId) => uuidMap[childId] || childId
+                );
+              }
+              updateChildrenReferences(obj[key], uuidMap);
             }
           }
         }
@@ -235,7 +265,11 @@
               try {
                 const content = event.target.result;
                 const json = JSON.parse(content);
-                replaceUUIDs(json);
+                const uuidMap = {};
+                // Find uuids to replace and generate new ones.
+                mapAndReplaceUUIDs(json, uuidMap);
+                // Update references to children bones.
+                updateChildrenReferences(json, uuidMap);
                 const newJsonString = JSON.stringify(json, null, 2);
                 const originalName = file.name
                   .split(".")
