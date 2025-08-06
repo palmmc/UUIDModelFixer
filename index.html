@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- saved from url=https://palmmc.github.io/UUIDModelFixer/ -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -225,12 +226,10 @@
           }
         }
       }
-
       function updateChildrenReferences(obj, uuidMap) {
         if (obj === null || typeof obj !== "object") {
           return;
         }
-
         if (Array.isArray(obj)) {
           obj.forEach((item) => updateChildrenReferences(item, uuidMap));
         } else {
@@ -247,7 +246,6 @@
           }
         }
       }
-
       async function handleFileProcessing() {
         const files = fileInput.files;
         if (files.length === 0) {
@@ -258,19 +256,29 @@
         updateStatus("Processing files...", "info");
         const zip = new JSZip();
         const promises = [];
+
+        // UUID regex
+        const uuidRegex =
+          /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi;
         for (const file of files) {
           const promise = new Promise((resolve, reject) => {
             const reader = new FileReader();
+
             reader.onload = (event) => {
               try {
-                const content = event.target.result;
-                const json = JSON.parse(content);
-                const uuidMap = {};
-                // Find uuids to replace and generate new ones.
-                mapAndReplaceUUIDs(json, uuidMap);
-                // Update references to children bones.
-                updateChildrenReferences(json, uuidMap);
-                const newJsonString = JSON.stringify(json, null, 2);
+                let content = event.target.result;
+
+                // Find all strings that match UUID format and replace all instances of that UUID with a new one.
+                const oldUuids = [...new Set(content.match(uuidRegex))];
+
+                if (oldUuids && oldUuids.length > 0) {
+                  oldUuids.forEach((oldUuid) => {
+                    const newUuid = generateUUID();
+                    const replaceRegex = new RegExp(oldUuid, "gi");
+                    content = content.replace(replaceRegex, newUuid);
+                  });
+                }
+
                 const originalName = file.name
                   .split(".")
                   .slice(0, -1)
@@ -280,13 +288,12 @@
                   extensionInput.value.trim().replace(".", "") ||
                   originalExtension;
                 const newFileName = `${originalName}.${targetExtension}`;
-                zip.file(newFileName, newJsonString);
+
+                zip.file(newFileName, content);
                 resolve();
               } catch (error) {
                 console.error(`Error processing file ${file.name}:`, error);
-                reject(
-                  `Failed to parse ${file.name}: Potentially invalid json.`
-                );
+                reject(`An unexpected error occurred with ${file.name}.`);
               }
             };
             reader.onerror = () => {
@@ -296,12 +303,13 @@
           });
           promises.push(promise);
         }
+
         try {
           await Promise.all(promises);
           if (Object.keys(zip.files).length === 0) {
-            throw new Error("No files were successfully processed.");
+            throw new Error("No files were selected or processed.");
           }
-          updateStatus("Zipping files...", "info");
+          updateStatus("Creating ZIP file...", "info");
           const content = await zip.generateAsync({ type: "blob" });
           const link = document.createElement("a");
           link.href = URL.createObjectURL(content);
@@ -310,7 +318,6 @@
           link.click();
           document.body.removeChild(link);
           URL.revokeObjectURL(link.href);
-
           updateStatus("Download complete!", "success");
         } catch (error) {
           updateStatus(error.toString(), "error");
